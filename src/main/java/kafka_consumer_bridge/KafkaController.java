@@ -20,7 +20,7 @@ public class KafkaController {
         try {
         
         
-        KeyedMessage<String, String> dataII = new KeyedMessage<String, String>("disqus.playback.out", null,post);
+        KeyedMessage<String, String> dataII = new KeyedMessage<String, String>(DisqusConsumer.outputTopic, null,post);
        
                 
         DisqusConsumer.kproducer.send(dataII);

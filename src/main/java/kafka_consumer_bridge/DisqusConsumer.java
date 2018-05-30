@@ -295,8 +295,8 @@ public class DisqusConsumer {
 				    	}
 				    	
 				    	if(msgType.equalsIgnoreCase("post") || msgType.equalsIgnoreCase("vote")){
-				    		msgCount+=1;
-				    		System.out.println("Count of post msgs: " + msgCount);
+				    		
+				    		//System.out.println("Count of post msgs: " + msgCount);
 				    		
 				    	} else {
 				    		return finalMsg;				    	
@@ -307,16 +307,20 @@ public class DisqusConsumer {
 				    String uniqueKey =publicId   + "_" + publicForumId;
 				      	
 			        if(!dupeList.containsKey(uniqueKey)){
-				        	dupeList.put(uniqueKey, uniqueKey);
-				        	hashMapCount +=1;
-				        } else {
-				        	return "";
-				        }
+			        	if(changed.equalsIgnoreCase("{}") && type_prev.equalsIgnoreCase(type_)){
+        		    		//Thread.sleep(1000);
+    			    		return "DUPLICATE";
+    			    	}
+				        dupeList.put(uniqueKey, uniqueKey);
+				        hashMapCount +=1;
+				    } else {
+				        	return "DUPLICATE";
+				    }
 				      	
-				        if(hashMapCount >= 500000){
+				    if(hashMapCount >= 50000){
 				        	hashMapCount = 0;
 				        	dupeList = new HashMap<String, String>();
-				        }
+				    }
 						
 				       /* if(recordsAffected ==0){
 				      	  recordsAffected = check_message(publicId, publicForumId);
@@ -329,7 +333,7 @@ public class DisqusConsumer {
 				         }*/
 				         
 				         
-				         System.out.println(" [x] Sent '" + msgCount + "' MESSAGES.");
+				         //System.out.println(" [x] Sent '" + msgCount + "' MESSAGES.");
 				        
 				        
 				    	//CHECK HBASE IF SOURCE EXISTS
@@ -338,11 +342,11 @@ public class DisqusConsumer {
 	        		   	
 				      	currRecord = get(publicForumId,publicId,publicThreadId);
 	        		    if(currRecord != null && currRecord.length != 0 ) {
-	        		    	if(changed.equalsIgnoreCase("{}") && type_prev.equalsIgnoreCase(type_)){
+	        		    	if(changed.equalsIgnoreCase("{}") && type_prev.equalsIgnoreCase(type_) && msgType.equalsIgnoreCase("Post")){
 	        		    		//Thread.sleep(1000);
-	    			    		//return "DUPLICATE";
+	    			    		return "DUPLICATE";
 	    			    	}
-	        		    	return "DUPLICATE";
+	        		  
 	        		  	}else {
 			 				 msgCount += 1;
 							//INSERT NEW SOURCE
@@ -352,7 +356,7 @@ public class DisqusConsumer {
 							if(!post.isEmpty()){
 								kp.sendMessage(post);
 							}
-							System.out.println("Delivered msgCount " + msgCount + " msg.");
+							//System.out.println("Delivered msgCount " + msgCount + " msg.");
 						    
 								 
 			 					 //increment value before insert***
@@ -364,9 +368,15 @@ public class DisqusConsumer {
 			   	}
 			   }
 		    
-		   	} catch (IOException e) {
+		   	} catch (Exception e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
+		   	  try {
+				efop.write("ERROR:" + e.getMessage() +"  "  + DateTime.now().toString());
+			} catch (IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+				
 		   	}
 		}
     	
@@ -379,7 +389,7 @@ public class DisqusConsumer {
     	try {
 	    		Put put = new Put(Bytes.toBytes(publicId + "_" + publicForumId));
 	    		
-	    		System.out.println("ADDED TO HBASE: " + publicId + "_" + publicForumId);
+	    		//System.out.println("ADDED TO HBASE: " + publicId + "_" + publicForumId);
 	    		
 				put.add(Bytes.toBytes("forum data"),Bytes.toBytes("forum ID"),Bytes.toBytes(publicForumId)); 
 	    		put.add(Bytes.toBytes("forum data"),Bytes.toBytes("public ID"),Bytes.toBytes(publicId));
@@ -389,6 +399,12 @@ public class DisqusConsumer {
     	} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+			try {
+				efop.write("ERROR:" + e.getMessage() +"  "  + DateTime.now().toString());
+			} catch (IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
 		}		
 		
 	}
@@ -410,7 +426,7 @@ public class DisqusConsumer {
   		  //valueII = r.getValue(Bytes.toBytes("forum data"), Bytes.toBytes("public Thread"));
   	 	  String valueStr = Bytes.toString(value);
       	   
-  	 	  System.out.println("RETRIEVED RECORD " + valueStr);
+  	 	  //System.out.println("RETRIEVED RECORD " + valueStr);
   	 	  
   	 	 
   	 	  
@@ -418,6 +434,7 @@ public class DisqusConsumer {
         }catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+			efop.write("ERROR:" + e.getMessage() +"  "  + DateTime.now().toString());
 		}
              	  
 		
@@ -871,10 +888,10 @@ public class DisqusConsumer {
 			for (Entry<String, String> e: conf) {
 				  System.out.println(e.getKey() + " ------> " + e.getValue());
 			}
-			 
+			rfop.write("Create hbase connection."  + "  "  + DateTime.now().toString()); 
 			ProducerConfig config = new ProducerConfig(props);
 			kproducer = new Producer<String, String>(config);
-			
+			rfop.write("kafka producer initiated"  + "  "  + DateTime.now().toString());
 			//ProducerConfig sysConfig = new ProducerConfig(propsII);
 			//mproducer = new Producer<String, String>(sysConfig);
 			
@@ -888,20 +905,22 @@ public class DisqusConsumer {
 		} catch (MessagingException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+			//errorReporting(e.getMessage().toString() + " " + " MAIN FUNCTION.");
 			try {
-				errorReporting(e.getMessage().toString() + " " + " MAIN FUNCTION.");
-			} catch (MessagingException e1) {
+				efop.write("ERROR MAIN - "  + e.getMessage() + " "  + DateTime.now().toString());
+			} catch (IOException e1) {
 				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			}
+			
 			
 		} catch (IOException e) {
 			
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 			try {
-				errorReporting(e.getMessage().toString() + " " + " MAIN FUNCTION.");
-			} catch (MessagingException e1) {
+				efop.write("ERROR MAIN - "  + e.getMessage() + " "  + DateTime.now().toString());
+			} catch (IOException e1) {
 				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			}
@@ -922,6 +941,9 @@ public class DisqusConsumer {
         topicCountMap.put(topic, new Integer(1));
         Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = consumer.createMessageStreams(topicCountMap);
         List<KafkaStream<byte[], byte[]>> streams = consumerMap.get(topic);
+        
+        rfop.write("Start consuming kafka topic: "  + inputTopic +"  "  + DateTime.now().toString());
+		
         
         for ( KafkaStream stream : streams) {
         	
@@ -949,7 +971,8 @@ public class DisqusConsumer {
             	 }  		
                  catch(Exception e)
                  {
-                 	e.printStackTrace();
+                	 efop.write("ERROR :"  +e.getMessage()+  "  "  + DateTime.now().toString());
+         			
                  	continue;
                  }
                  
@@ -969,7 +992,7 @@ public class DisqusConsumer {
         }
         }
         
-    private static void getConfigurations() {
+    private static void getConfigurations(){
 		
 		 Properties fileProp = new Properties();
 		 try {
@@ -977,7 +1000,7 @@ public class DisqusConsumer {
 				
 				
 		    fileProp.load(DisqusConsumer.class.getClassLoader().getResourceAsStream("config.properties"));
-		    System.out.println("READING CONFIG PROPERTIES FILE...");
+		    //System.out.println("READING CONFIG PROPERTIES FILE...");
 	   		
 		 
 		    connectionString = fileProp.getProperty("MySQLConnectionString");
@@ -998,8 +1021,14 @@ public class DisqusConsumer {
 			streamURL =fileProp.getProperty("streamUrl");
 			
 			
-		} catch (IOException io) {
-			io.printStackTrace();
+		} catch (Exception io) {
+			 try {
+				efop.write("Error:" + io.getMessage()+ "  "  + DateTime.now().toString());
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				//e.printStackTrace();
+			}
+				
 		} 		
 			
 		}
@@ -1025,8 +1054,8 @@ public class DisqusConsumer {
 	       
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
-			errorReporting(e.getMessage().toString());
+			//e.printStackTrace();
+			///errorReporting(e.getMessage().toString());
 		}
 		  
 	 }
